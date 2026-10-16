@@ -1,0 +1,14 @@
+{
+  "database": {
+  "server_name": "192.168.1.168",
+  "istanza": "sqlexpress",
+  "db": "netpro",
+  "driver": "ODBC Driver 18 for SQL Server",
+  "autenticazione": "sql",
+  "username": "netpro",
+  "password": "netpro",
+  "encrypt": true,
+  "trust_server_certificate": true
+   },
+  "file_csv": "Ordini Alba Tramezzini.csv"
+}

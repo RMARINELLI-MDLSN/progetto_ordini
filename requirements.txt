@@ -1,0 +1,2 @@
+# Necessario solo per esegui_sql.py; il generatore usa la libreria standard.
+pyodbc>=5.0,<6.0
