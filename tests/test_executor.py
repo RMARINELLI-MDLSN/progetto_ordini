@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
-from ordini_sql.executor import separa_batch, prepara_file, stringa_connessione, esegui_file
+from ordini_sql.executor import separa_batch, prepara_file, stringa_connessione, esegui_file, esegui_tutti
 
 class ExecutorTests(unittest.TestCase):
     def test_go_fuori_dalle_stringhe(self):
@@ -38,6 +38,7 @@ class ExecutorTests(unittest.TestCase):
 
     def connection(self):
         connection = Mock()
+        connection.autocommit = False
         connection.cursor.return_value.nextset.return_value = False
         return connection
 
@@ -66,5 +67,41 @@ class ExecutorTests(unittest.TestCase):
         connection = self.connection()
         connection.cursor.return_value.execute.side_effect = RuntimeError('errore')
         connection.rollback.side_effect = RuntimeError('connessione persa')
-        with self.assertRaisesRegex(RuntimeError, 'rollback non confermato'):
+        with self.assertRaisesRegex(RuntimeError, 'rollback globale non confermato'):
             esegui_file(connection, ['INSERT uno'])
+
+    def test_transazione_globale_due_file(self):
+        connection = self.connection()
+        def execute(sql):
+            connection.commit.assert_not_called()
+        connection.cursor.return_value.execute.side_effect = execute
+        result = esegui_tutti(connection, [(Path('a.sql'), ['INSERT A']),
+                                         (Path('b.sql'), ['INSERT B', 'INSERT C'])])
+        self.assertEqual(result, (2, 3))
+        connection.commit.assert_called_once()
+        connection.rollback.assert_not_called()
+
+    def test_errore_secondo_file_annulla_tutto(self):
+        connection = self.connection()
+        connection.cursor.return_value.execute.side_effect = [None, None, RuntimeError('errore B')]
+        with self.assertRaisesRegex(RuntimeError, 'rollback eseguito su tutti i file'):
+            esegui_tutti(connection, [(Path('a.sql'), ['INSERT A']),
+                                     (Path('b.sql'), ['INSERT B'])])
+        connection.commit.assert_not_called()
+        connection.rollback.assert_called_once()
+
+    def test_autocommit_vietato(self):
+        connection = self.connection()
+        connection.autocommit = True
+        with self.assertRaises(ValueError):
+            esegui_tutti(connection, [(Path('a.sql'), ['INSERT A'])])
+        connection.cursor.assert_not_called()
+
+    def test_interruzione_annulla_tutto(self):
+        connection = self.connection()
+        connection.cursor.return_value.execute.side_effect = [None, None, KeyboardInterrupt()]
+        with self.assertRaises(KeyboardInterrupt):
+            esegui_tutti(connection, [(Path('a.sql'), ['INSERT A']),
+                                     (Path('b.sql'), ['INSERT B'])])
+        connection.rollback.assert_called_once()
+        connection.commit.assert_not_called()

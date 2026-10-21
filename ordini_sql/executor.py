@@ -1,4 +1,4 @@
-"""Esegue gli SQL del generatore, una transazione per file."""
+"""Esegue gli SQL del generatore, un’unica transazione per tutti i file selezionati."""
 import re
 from pathlib import Path
 
@@ -56,7 +56,9 @@ def prepara_file(percorso, database):
     if match.group(1).replace(']]', ']') != database:
         raise ValueError(f'{percorso}: database nello script diverso da config.json; rigenerare gli SQL.')
     inserts = batches[1:]
-    if not inserts or any(not re.match(r'^INSERT\s+\[dbo\]\.\[', b, re.I) for b in inserts):
+    if not inserts or any(not (re.match(r'^INSERT\s+\[dbo\]\.\[', b, re.I) or
+                                   (b.startswith('DECLARE @progressivo_situazione int = 1;\n')
+                                    and '\nINSERT [dbo].[situazioni] (' in b)) for b in inserts):
         raise ValueError(f'{percorso}: sono supportati gli INSERT prodotti dal generatore.')
     return inserts
 
@@ -92,29 +94,58 @@ def stringa_connessione(database):
     return ';'.join(parts) + ';'
 
 
-def esegui_file(connessione, batches):
-    """Commit solo dopo tutti gli INSERT del file; rollback in caso di errore."""
+def esegui_tutti(connessione, files, notifica=None):
+    """Esegue (percorso, batches) con un solo commit finale e rollback globale.
+
+    Richiede una connessione dedicata con autocommit=False.
+    I file devono essere già validati da prepara_file.
+    """
+    if connessione.autocommit is not False:
+        raise ValueError('La transazione globale richiede autocommit=False.')
     cursor = connessione.cursor()
     fase = 'impostazioni'
+    totale = 0
+    completati = 0
     try:
         cursor.execute('SET XACT_ABORT ON; SET NOCOUNT ON;')
-        for numero, batch in enumerate(batches, 1):
-            fase = f'INSERT {numero}/{len(batches)}'
-            cursor.execute(batch)
-            while cursor.nextset():
-                pass
+        for path, batches in files:
+            fase = f'file {path}'
+            if notifica:
+                notifica(f'IN ESECUZIONE {Path(path).name}')
+            for numero, batch in enumerate(batches, 1):
+                fase = f'{Path(path).name}, INSERT {numero}/{len(batches)}'
+                cursor.execute(batch)
+                while cursor.nextset():
+                    pass
+            totale += len(batches)
+            completati += 1
+            if notifica:
+                notifica(f'ESEGUITO {Path(path).name}: {len(batches)} INSERT, in attesa del commit finale.')
         fase = 'commit'
         connessione.commit()
     except BaseException as errore:
         try:
             connessione.rollback()
         except Exception:
-            raise RuntimeError(f'Errore durante {fase}; rollback non confermato. Verificare il database prima di riprovare.') from errore
+            raise RuntimeError(f'Errore durante {fase}; rollback globale non confermato. '
+                               'Verificare il database prima di riprovare.') from errore
         if fase == 'commit':
             raise RuntimeError('Esito del commit incerto; verificare il database prima di riprovare.') from errore
-        if isinstance(errore, (KeyboardInterrupt, SystemExit)):
+        if isinstance(errore, KeyboardInterrupt):
+            raise KeyboardInterrupt('Interrotto: rollback globale eseguito, nessun file confermato.') from errore
+        if isinstance(errore, SystemExit):
             raise
-        raise RuntimeError(f'{fase} fallito; rollback eseguito. {errore}') from errore
+        raise RuntimeError(f'{fase} fallito; rollback eseguito su tutti i file del caricamento. {errore}') from errore
     finally:
-        cursor.close()
-    return len(batches)
+        # Un errore di chiusura non deve nascondere l'esito della transazione.
+        try:
+            cursor.close()
+        except Exception:
+            pass
+    return completati, totale
+
+
+def esegui_file(connessione, batches):
+    """Compatibilità per chiamanti che eseguono un singolo file isolato."""
+    _, totale = esegui_tutti(connessione, [(Path('script.sql'), batches)])
+    return totale

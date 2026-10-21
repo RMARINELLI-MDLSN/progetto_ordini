@@ -9,7 +9,7 @@ Genera un SQL per riga CSV; non si connette al database e non esegue query.
 2. Modifica `config.json`: server, istanza, nome database e `file_csv`.
 3. Esegui `python leggi_ordini.py`.
 
-Il config.json punta al nuovo CSV Ordini_Alba_Tramezzini_CLIENTE.csv, incluso nel progetto. Il precedente CSV con tre ordini resta come riferimento per i test.
+Il config.json punta al nuovo CSV Ordini_Alba_Tramezzini_data_fine_calcolata.csv, incluso nel progetto. Il precedente CSV con tre ordini resta come riferimento per i test.
 I percorsi relativi nel JSON sono risolti rispetto alla cartella del JSON.
 L'istanza predefinita si indica con una stringa vuota.
 Server e istanza restano predisposti; il nome database viene usato nel comando USE.
@@ -111,11 +111,13 @@ Controlla che la cartella non contenga SQL di precedenti generazioni che non vuo
 `--verifica` controlla la struttura dei file e il database USE senza aprire connessioni;
 non verifica vincoli, tabelle o validità SQL sul server.
 
-Un file corrisponde a una transazione. Tutti i suoi INSERT vengono confermati insieme;
-in caso di errore viene eseguito il rollback e l'esecuzione si ferma. I file precedenti
-rimangono confermati. Se il commit o il rollback non sono confermati viene segnalato
-l'esito incerto: verificare sul database prima di riprovare. Il comando non ritenta
-automaticamente e non evita duplicati: non rilanciare i file già importati.
+Tutti i file selezionati appartengono a un'unica transazione: un solo commit dopo
+l'ultimo file. In caso di errore o interruzione durante l'esecuzione, il rollback
+annulla anche gli INSERT dei file precedenti di questo caricamento. Durante
+l'esecuzione i file sono indicati come in attesa del commit finale.
+Se il commit o il rollback non sono confermati viene segnalato l'esito incerto:
+verificare sul database prima di riprovare. Il comando non ritenta automaticamente.
+I caricamenti confermati in esecuzioni precedenti non vengono annullati.
 
 Il separatore GO viene gestito dal programma e non inviato al server. Sono supportati
 i file generati dal progetto (USE iniziale e batch INSERT). Il database USE deve
@@ -123,3 +125,60 @@ coincidere con config.json: se cambi database rigenera gli SQL.
 
 Riferimenti: https://github.com/mkleehammer/pyodbc e
 https://learn.microsoft.com/en-us/sql/connect/odbc/dsn-connection-string-attribute
+
+## Campi setup derivati dal CSV
+
+TEFF_SETUP_MAC nel CSV è espresso in ore. La durata da aggiungere agli orari è
+`setup_secondi = int(TEFF_SETUP_MAC * 3600)`, arrotondata per difetto:
+0.01389 ore diventano 50 secondi, 0.00750 ore diventano 27 secondi.
+
+- TEFF_SETUP_MAN = TEFF_SETUP_MAC.
+- CHIUSURA_ATTREZZAGGIO = DATA_INIZIO + setup_secondi, troncata al secondo inferiore.
+- INIZIO_LAVORAZIONE = CHIUSURA_ATTREZZAGGIO + WSET_WORK secondi.
+- DATA_FINE = INIZIO_LAVORAZIONE + VALORE01 minuti + setup_secondi, troncata al secondo inferiore.
+
+CHIUSURA_ATTREZZAGGIO e DATA_FINE hanno sempre millesimi .000.
+Esempio: DATA_INIZIO 09:03:00, setup 0.01389, WSET_WORK 5 e VALORE01 12
+producono chiusura 09:03:50, inizio lavorazione 09:03:55 e fine 09:16:45.
+Le durate devono essere non negative. I quattro campi derivati vengono ricalcolati
+anche se presenti nei vecchi CSV; tutti i generatori ricevono la stessa riga completata.
+DATA_UPD e le date programmate restano lette dal CSV.
+
+Per situazioni con TIPO_OGGETTO MAC e PROGRESSIVO 2, LAVORO è la differenza
+ORA_FINE - ORA_INIZIO in ore decimali. Attualmente WSET ha progressivo 1
+(LAVORO zero), mentre WORK ha progressivo 2.
+
+FPROCESSDATA viene generata esclusivamente per COD_CICLO da CYC_FORNO1 a CYC_FORNO7
+(confronto senza distinzione di maiuscole, ignorando gli spazi esterni).
+Gli altri cicli, incluso CYC_FORNI1, generano tutte le altre query ma nessuna
+INSERT FPROCESSDATA; VALORE02 non è richiesto per questi cicli.
+
+## Progressivi SITUAZIONI
+
+Gli INSERT SITUAZIONI cercano in esecuzione il primo PROGRESSIVO positivo libero
+(da 1 a 99999) per OGGETTO, TIPO_OGGETTO e DATA. I valori già inseriti nella stessa
+transazione sono inclusi nella ricerca. UPDLOCK e HOLDLOCK proteggono la scelta
+fino alla fine della transazione. Se i progressivi sono esauriti, il caricamento fallisce.
+La fase WSET/WORK resta indipendente dal progressivo assegnato: LAVORO è zero per
+WSET e la durata effettiva per WORK. Non viene saltata alcuna riga già esistente.
+Rigenerare gli SQL con leggi_ordini.py e usare l'esecutore aggiornato.
+È richiesta una transazione attiva; esegui_sql.py mantiene il commit unico finale.
+
+## Quantità da CSV per cicli non forno
+
+QTY_COMPLETATA e QTY_RICHIESTA sono obbligatorie, numeriche e non negative
+per tutti i cicli eccetto CYC_FORNO1–CYC_FORNO7 (maiuscole e spazi ignorati).
+Popolano rispettivamente QTA_COMPLETATA e QTA_RICHIESTA nei campi SQL esistenti:
+ORDINI, OPERAZIONI e JOBSET ricevono entrambe; TASKS riceve QTA_RICHIESTA.
+Negli EVENTI la completata viene assegnata solo a CLS; nelle SITUAZIONI solo
+a WORK, mentre QTA_RICHIESTA viene assegnata anche a WSET.
+I forni ignorano le due colonne e mantengono il comportamento precedente.
+QTA_CONTATA è uguale a QTA_COMPLETATA in EVENTI e SITUAZIONI.
+In TASKS QTA_CONTATA resta zero; in JOBSET resta NULL.
+In ORDINI QTA_VERSATA è uguale a QTA_COMPLETATA.
+Per SITUAZIONI WSET resta zero, per WORK usa QTY_COMPLETATA (sia MAC sia OPE).
+In TASKS CICLI_CONTATI legge QTY_COMPLETATA dal CSV.
+In ORDINI QTA_LANCIATA è uguale a QTA_RICHIESTA.
+I tempi mantengono le regole precedenti legate a VALORE01.
+MINIPAN: completata 150, richiesta 150. ALMA: completata 30, richiesta 60.
+Le colonne nei CSV dei forni riportano zero, come gli SQL modello originali.

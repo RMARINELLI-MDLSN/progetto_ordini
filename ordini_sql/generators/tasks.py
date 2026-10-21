@@ -1,5 +1,6 @@
 """Generazione INSERT per tasks; valori e regole del modello originale."""
 
+from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
 
 COLONNE_TASKS = """
@@ -73,6 +74,7 @@ def costruisci_insert_tasks(riga):
     ore = minuti_in_ore_sql(riga["VALORE01"])
     valori["TEFF_LAVORO_MAC"] = ore
     valori["TEFF_LAVORO_MAN"] = ore
+    applica_quantita(valori, riga, aggiorna_contata=False)
     nomi = ", ".join(f"[{c}]" for c in COLONNE_TASKS)
     dati = ",\n    ".join(valori[c] for c in COLONNE_TASKS)
     return f"INSERT [dbo].[TASKS] ({nomi})\nVALUES (\n    {dati}\n);\nGO\n"

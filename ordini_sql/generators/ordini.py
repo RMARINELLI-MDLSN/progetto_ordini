@@ -1,5 +1,6 @@
 """Generazione INSERT per ordini; valori e regole del modello originale."""
 
+from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
 
 COLONNE = """
@@ -76,6 +77,7 @@ def costruisci_insert(riga):
             valore = riga[campo]
             valori[campo] = converti(valore) if valore.strip() else "NULL"
     # TASK, UTENTE_TASK e gli altri campi non presenti in ORDINI non vengono inseriti.
+    applica_quantita(valori, riga)
     nomi = ", ".join(f"[{c}]" for c in COLONNE)
     dati = ",\n    ".join(valori[c] for c in COLONNE)
     return f"INSERT [dbo].[ORDINI] ({nomi})\nVALUES (\n    {dati}\n);\nGO\n"

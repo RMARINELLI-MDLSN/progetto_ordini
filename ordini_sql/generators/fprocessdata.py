@@ -16,10 +16,14 @@ SCOSTAMENTI_FNVALUE01 = (3, 2, -1, -2, 6, 7, 5, 3, 0, -2, 6, 6)
 def costruisci_insert_fprocessdata(riga):
     """Genera VALORE01 campioni, uno al minuto, da DATA_INIZIO + 1 minuto.
 
+    Solo COD_CICLO CYC_FORNO1..CYC_FORNO7 (ignora maiuscole e spazi esterni).
+    Gli altri cicli non generano campioni e non richiedono VALORE02.
     VALORE01 deve essere un intero non negativo (zero genera zero campioni).
     FNVALUE02 va da 0 a VALORE01-1. FNVALUE01 oscilla attorno a VALORE02
     usando gli scostamenti ciclici sopra. Mantiene tutte le 212 colonne.
     """
+    if riga.get("COD_CICLO", "").strip().upper() not in {f"CYC_FORNO{i}" for i in range(1, 8)}:
+        return
     richiesti = {"MACCHINA", "TASK", "VALORE01", "VALORE02", "DATA_INIZIO"}
     mancanti = sorted(richiesti - riga.keys())
     if mancanti:

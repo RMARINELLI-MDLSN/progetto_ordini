@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ordini_sql.executor import prepara_file
 from ordini_sql.config import carica_config
 from ordini_sql.service import genera_script
 from ordini_sql.conversions import minuti_in_ore_sql
@@ -25,6 +26,17 @@ class RegressionTests(unittest.TestCase):
             self.assertEqual(sum(count for _, count in results), 84)
             actual = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path, _ in results}
             self.assertEqual(actual, expected)
+            for path, count in results:
+                batches = prepara_file(path, config["database"]["db"])
+                self.assertEqual(len(batches), count)
+                situazioni = batches[-4:]
+                for batch in situazioni:
+                    self.assertTrue(batch.startswith("DECLARE @progressivo_situazione int = 1;"))
+                    self.assertIn("WITH (UPDLOCK, HOLDLOCK)", batch)
+                    self.assertIn("[PROGRESSIVO] = @progressivo_situazione", batch)
+                    self.assertIn("@progressivo_situazione > 99999", batch)
+                    self.assertIn("IF @@TRANCOUNT = 0 THROW", batch)
+
 
     def test_minuti_in_ore(self):
         self.assertEqual(minuti_in_ore_sql("12"), "CAST(0.20000 AS Numeric(15, 5))")

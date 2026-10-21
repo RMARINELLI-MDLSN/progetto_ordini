@@ -1,5 +1,6 @@
 """Generazione INSERT per operazioni; valori e regole del modello originale."""
 
+from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
 
 COLONNE_OPERAZIONI = """
@@ -88,6 +89,7 @@ def costruisci_insert_operazioni(riga):
     ore = minuti_in_ore_sql(riga["VALORE01"])
     valori["TEFF_LAVORO_MAC"] = ore
     valori["TEFF_LAVORO_MAN"] = ore
+    applica_quantita(valori, riga)
     nomi = ", ".join(f"[{c}]" for c in COLONNE_OPERAZIONI)
     dati = ",\n    ".join(valori[c] for c in COLONNE_OPERAZIONI)
     return f"INSERT [dbo].[OPERAZIONI] ({nomi})\nVALUES (\n    {dati}\n);\nGO\n"

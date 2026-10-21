@@ -1,5 +1,6 @@
 """Esegue i file SQL sul database indicato in config.json.
 
+Unica transazione per tutti i file: commit finale, rollback globale su errore.
 Uso: python esegui_sql.py
 Controllo senza connessione: python esegui_sql.py --verifica
 """
@@ -7,21 +8,19 @@ import argparse
 from pathlib import Path
 
 from ordini_sql.config import carica_config
-from ordini_sql.executor import prepara_file, stringa_connessione, esegui_file
+from ordini_sql.executor import prepara_file, stringa_connessione, esegui_tutti
 
 
 def main():
     parser = argparse.ArgumentParser(description='Esegue gli SQL sul database di config.json.')
     parser.add_argument('--config', type=Path, default=Path(__file__).resolve().with_name('config.json'))
     parser.add_argument('--cartella', type=Path, help='Cartella SQL alternativa; relativa alla cartella corrente.')
-    parser.add_argument('--file', type=Path, help='Esegue un solo file SQL, ad esempio per ripartire dopo un errore.')
+    parser.add_argument('--file', type=Path, help='Esegue un solo file SQL.')
     parser.add_argument('--verifica', action='store_true', help='Valida i file senza collegarsi al database.')
     args = parser.parse_args()
     if args.file and args.cartella:
         parser.error('Usare --file oppure --cartella, non entrambi.')
     connessione = None
-    completati = 0
-    totale = 0
     try:
         config = carica_config(args.config)
         db = config['database']
@@ -52,17 +51,13 @@ def main():
         if driver not in pyodbc.drivers():
             raise ValueError(f'Driver ODBC non installato: {driver}. Installarlo o configurare database.driver.')
         connessione = pyodbc.connect(connection_string, autocommit=False, timeout=15)
-        for path, batches in pronti:
-            print(f'IN ESECUZIONE {path.name}', flush=True)
-            conteggio = esegui_file(connessione, batches)
-            completati += 1
-            totale += conteggio
-            print(f'OK {path.name}: {conteggio} INSERT, commit eseguito.', flush=True)
-        print(f'Completati {completati} file, {totale} INSERT.')
-    except KeyboardInterrupt:
-        parser.exit(130, f'Interrotto. File già confermati: {completati}.\n')
+        completati, totale = esegui_tutti(
+            connessione, pronti, notifica=lambda messaggio: print(messaggio, flush=True))
+        print(f'COMMIT FINALE ESEGUITO: {completati} file, {totale} INSERT confermati.')
+    except KeyboardInterrupt as errore:
+        parser.exit(130, f'{errore or "Interrotto prima dell’esecuzione SQL."}\n')
     except Exception as errore:
-        parser.exit(1, f'ERRORE: {errore}\nFile già confermati: {completati}. Esecuzione fermata.\n')
+        parser.exit(1, f'ERRORE: {errore}\nEsecuzione fermata.\n')
     finally:
         if connessione is not None:
             connessione.close()

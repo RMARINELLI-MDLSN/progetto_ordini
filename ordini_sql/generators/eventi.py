@@ -1,5 +1,6 @@
 """Generazione INSERT per eventi; valori e regole del modello originale."""
 
+from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
 
 COLONNE_EVENTI = ['TASK', 'TIPO_OGGETTO', 'OGGETTO', 'EVENTO', 'ORA_EVENTO', 'CAUSALE', 'EXPORTDATE', 'FOBJECT', 'ID_OPER', 'INFO1', 'INFO10', 'INFO11', 'INFO12', 'INFO13', 'INFO14', 'INFO15', 'INFO16', 'INFO17', 'INFO18', 'INFO19', 'INFO2', 'INFO20', 'INFO3', 'INFO4', 'INFO5', 'INFO6', 'INFO7', 'INFO8', 'INFO9', 'INFORMAZIONE', 'LOTTO', 'MACCHINA', 'PART_NUMBER', 'QTA_CICLO', 'QTA_COMPLETATA', 'QTA_CONTATA', 'QTA_SCARTATA', 'QTA_SOSPESA', 'QUANTITA1', 'QUANTITA2', 'QUANTITA3', 'QUANTITA4', 'SOURCE', 'TEMPO', 'TEMPO_SETUP', 'UTENTE', 'OPERATORE', 'FSERIAL', 'PROGRESSIVO', 'FALTPNUMB', 'QTA_RILAVORATA', 'FSKILL', 'QTA_CONTATA_SCARTI', 'PWR_WORK', 'PWR_SETUP']
@@ -235,6 +236,7 @@ def costruisci_insert_eventi(riga):
                 quantita = riga["VALORE01"]
                 valori["PART_NUMBER"] = sql_testo(part_number) if part_number.strip() else "NULL"
                 valori["QTA_CONTATA"] = sql_numero(quantita) if quantita.strip() else "NULL"
+            applica_quantita(valori, riga, completata=evento == "CLS")
             nomi = ", ".join(f"[{c}]" for c in COLONNE_EVENTI)
             dati = ",\n    ".join(valori[c] for c in COLONNE_EVENTI)
             istruzioni.append(f"INSERT [dbo].[eventi] ({nomi})\nVALUES (\n    {dati}\n);\nGO\n")
