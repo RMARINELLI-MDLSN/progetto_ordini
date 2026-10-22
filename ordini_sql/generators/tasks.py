@@ -1,6 +1,7 @@
 """Generazione INSERT per tasks; valori e regole del modello originale."""
 
 from datetime import datetime, timedelta
+from ..minipan import SETUP_ORE, lavoro_pianificato
 from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
 
@@ -88,6 +89,12 @@ def costruisci_insert_tasks(riga):
         valori['TOT_LAVORO_MAC'] = totale
         valori['TOT_LAVORO_MAN'] = totale
         valori['TOT_SETUP_MAC'] = valori['TEFF_SETUP_MAC']
+    if riga['COD_CICLO'].strip().upper() == 'CYC_MINIPAN':
+        for risorsa in ('MAC', 'MAN'):
+            valori['TOT_SETUP_' + risorsa] = sql_numero(str(SETUP_ORE))
+            valori['TOT_LAVORO_' + risorsa] = sql_numero(str(lavoro_pianificato(riga)))
+        # QUANTITA1 è il nome storico nel CSV; QUANTITA01 ha precedenza se fornita.
+        valori['FVALUE01'] = sql_numero(riga.get('QUANTITA01', riga['QUANTITA1']))
     nomi = ", ".join(f"[{c}]" for c in COLONNE_TASKS)
     dati = ",\n    ".join(valori[c] for c in COLONNE_TASKS)
     return f"INSERT [dbo].[TASKS] ({nomi})\nVALUES (\n    {dati}\n);\nGO\n"

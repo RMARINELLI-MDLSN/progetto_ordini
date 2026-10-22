@@ -191,7 +191,7 @@ Solo CYC_MINIPAN richiede QUANTITA1 e QUANTITA2 nel CSV (numeriche non negative)
 Sono assegnate ai campi omonimi in ORDINI, OPERAZIONI e JOBSET;
 in EVENTI solo a CLS e in SITUAZIONI solo a WORK, sia MAC sia OPE.
 WSET mantiene le quantità a zero; gli altri eventi mantengono NULL.
-TASKS non contiene questi due campi: FVALUE01/FVALUE02 restano invariati.
+TASKS: FVALUE01 copia QUANTITA01 se presente, altrimenti QUANTITA1; FVALUE02 resta invariato.
 Il CSV MINIPAN incluso contiene 10 e 10, come le query di riferimento.
 
 ## Regole CASSETTEPANE
@@ -208,3 +208,7 @@ Le date programmate devono essere presenti e ordinate cronologicamente.
 Solo per CYC_CASSETTEPANE, in OPERAZIONI QTA_SCARTATA e QTA_SOSPESA sono zero.
 
 Per `CYC_CASSETTEPANE`, in EVENTI `QTA_CICLO` vale 2 solo per OPNS e OPN (MAC e OPE); per CLSS e CLS vale NULL. In SITUAZIONI vale 2 su tutte le righe WSET e WORK, sia MAC sia OPE.
+
+Solo MINIPAN: TASKS TOT_SETUP_MAC/MAN = 0.08330 ore esatte. TOT_LAVORO_MAC/MAN = (DATA_FINE_PROG - DATA_INIZ_PROG) in ore meno il rispettivo setup, a cinque decimali. Intervalli inferiori al setup sono rifiutati. OPERAZIONI T_LAVORO_MAC/MAN copia il rispettivo TOT_SETUP di TASKS (0.08330).
+
+Solo MINIPAN: anche OPERAZIONI T_SETUP_MAC e T_SETUP_MAN copiano rispettivamente TASKS TOT_SETUP_MAC e TOT_SETUP_MAN (0.08330 ore).

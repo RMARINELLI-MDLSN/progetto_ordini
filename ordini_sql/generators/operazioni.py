@@ -1,5 +1,6 @@
 """Generazione INSERT per operazioni; valori e regole del modello originale."""
 
+from ..minipan import SETUP_ORE
 from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
 
@@ -94,6 +95,11 @@ def costruisci_insert_operazioni(riga):
     if riga["COD_CICLO"].strip().upper() == "CYC_CASSETTEPANE":
         valori["QTA_SCARTATA"] = sql_numero("0")
         valori["QTA_SOSPESA"] = sql_numero("0")
+    if riga["COD_CICLO"].strip().upper() == "CYC_MINIPAN":
+        valori["T_LAVORO_MAC"] = sql_numero(str(SETUP_ORE))
+        valori["T_LAVORO_MAN"] = sql_numero(str(SETUP_ORE))
+        valori["T_SETUP_MAC"] = sql_numero(str(SETUP_ORE))
+        valori["T_SETUP_MAN"] = sql_numero(str(SETUP_ORE))
     applica_quantita(valori, riga)
     nomi = ", ".join(f"[{c}]" for c in COLONNE_OPERAZIONI)
     dati = ",\n    ".join(valori[c] for c in COLONNE_OPERAZIONI)
