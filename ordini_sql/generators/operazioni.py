@@ -49,7 +49,7 @@ def costruisci_insert_operazioni(riga):
     """Mantiene il modello OPERAZIONI e sostituisce i soli campi richiesti.
 
     ID_OPER deriva da TASK; OPERAZIONE da OPERAZIONI; MACCHINA_ASSEGNATA
-    da MACCHINA. CENTRO_REALE resta CDL02 e UTENTE_UPD resta WS come nel modello.
+    da MACCHINA. CENTRO_REALE copia CENTRO_ASSEGNATO e UTENTE_UPD resta WS come nel modello.
     I tempi di lavoro derivano da VALORE01 / 60, come per TASKS.
     """
     richiesti = (list(TESTO_OPERAZIONI.values()) + list(DATE_OPERAZIONI.values())
@@ -75,7 +75,7 @@ def costruisci_insert_operazioni(riga):
         valori[campo] = "CAST(0 AS Numeric(6, 0))"
     for campo in ("NUM_OPERAI_LAVORO", "NUM_OPERAI_SETUP"):
         valori[campo] = "CAST(0.00 AS Numeric(5, 2))"
-    for campo, valore in {"CENTRO_REALE": "CDL02", "LOCALE": "LOC", "STATO": "COM",
+    for campo, valore in {"LOCALE": "LOC", "STATO": "COM",
                           "TIPO": "WRK", "UTENTE_UPD": "WS", "TYPE_OVER": "P",
                           "FACTIVE": "Y", "FALTFORCED": "N"}.items():
         valori[campo] = sql_testo(valore)
@@ -89,6 +89,11 @@ def costruisci_insert_operazioni(riga):
     ore = minuti_in_ore_sql(riga["VALORE01"])
     valori["TEFF_LAVORO_MAC"] = ore
     valori["TEFF_LAVORO_MAN"] = ore
+    valori["CENTRO_REALE"] = valori["CENTRO_ASSEGNATO"]
+    valori["NUM_SPLIT"] = "CAST(0 AS Numeric(6, 0))" if riga["COD_CICLO"].strip().upper() in {"CYC_MINIPAN", "CYC_CASSETTEPANE"} else "NULL"
+    if riga["COD_CICLO"].strip().upper() == "CYC_CASSETTEPANE":
+        valori["QTA_SCARTATA"] = sql_numero("0")
+        valori["QTA_SOSPESA"] = sql_numero("0")
     applica_quantita(valori, riga)
     nomi = ", ".join(f"[{c}]" for c in COLONNE_OPERAZIONI)
     dati = ",\n    ".join(valori[c] for c in COLONNE_OPERAZIONI)

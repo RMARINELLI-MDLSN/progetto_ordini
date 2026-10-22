@@ -10,5 +10,5 @@
   "encrypt": true,
   "trust_server_certificate": true
    },
-  "file_csv": "Ordini_ALMA.csv"
+  "file_csv": "Ordini_TRASBELT.csv"
 }

@@ -1,5 +1,6 @@
 """Generazione INSERT per tasks; valori e regole del modello originale."""
 
+from datetime import datetime, timedelta
 from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
 
@@ -75,6 +76,18 @@ def costruisci_insert_tasks(riga):
     valori["TEFF_LAVORO_MAC"] = ore
     valori["TEFF_LAVORO_MAN"] = ore
     applica_quantita(valori, riga, aggiorna_contata=False)
+    if riga['COD_CICLO'].strip().upper() == 'CYC_CASSETTEPANE':
+        for campo in ('DATA_INIZ_PROG', 'DATA_FINE_PROG'):
+            if not riga[campo].strip():
+                raise ValueError(f'{campo} è obbligatoria per i totali CASSETTEPANE.')
+        inizio_prog = datetime.fromisoformat(riga['DATA_INIZ_PROG'].strip())
+        fine_prog = datetime.fromisoformat(riga['DATA_FINE_PROG'].strip())
+        if fine_prog < inizio_prog:
+            raise ValueError('DATA_FINE_PROG precede DATA_INIZ_PROG per CASSETTEPANE.')
+        totale = sql_numero(str((fine_prog - inizio_prog) // timedelta(hours=1)))
+        valori['TOT_LAVORO_MAC'] = totale
+        valori['TOT_LAVORO_MAN'] = totale
+        valori['TOT_SETUP_MAC'] = valori['TEFF_SETUP_MAC']
     nomi = ", ".join(f"[{c}]" for c in COLONNE_TASKS)
     dati = ",\n    ".join(valori[c] for c in COLONNE_TASKS)
     return f"INSERT [dbo].[TASKS] ({nomi})\nVALUES (\n    {dati}\n);\nGO\n"

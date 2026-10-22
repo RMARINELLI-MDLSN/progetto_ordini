@@ -237,6 +237,8 @@ def costruisci_insert_eventi(riga):
                 valori["PART_NUMBER"] = sql_testo(part_number) if part_number.strip() else "NULL"
                 valori["QTA_CONTATA"] = sql_numero(quantita) if quantita.strip() else "NULL"
             applica_quantita(valori, riga, completata=evento == "CLS")
+            if riga["COD_CICLO"].strip().upper() == "CYC_CASSETTEPANE":
+                valori["QTA_CICLO"] = sql_numero("2") if evento in ("OPNS", "OPN") else "NULL"
             nomi = ", ".join(f"[{c}]" for c in COLONNE_EVENTI)
             dati = ",\n    ".join(valori[c] for c in COLONNE_EVENTI)
             istruzioni.append(f"INSERT [dbo].[eventi] ({nomi})\nVALUES (\n    {dati}\n);\nGO\n")

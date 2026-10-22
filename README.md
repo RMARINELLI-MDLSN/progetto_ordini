@@ -182,3 +182,29 @@ In ORDINI QTA_LANCIATA è uguale a QTA_RICHIESTA.
 I tempi mantengono le regole precedenti legate a VALORE01.
 MINIPAN: completata 150, richiesta 150. ALMA: completata 30, richiesta 60.
 Le colonne nei CSV dei forni riportano zero, come gli SQL modello originali.
+
+## Centro reale e quantità MINIPAN
+
+In OPERAZIONI, CENTRO_REALE copia CENTRO_ASSEGNATO per tutti i cicli.
+NUM_SPLIT è zero per CYC_MINIPAN e CYC_CASSETTEPANE, NULL per gli altri cicli.
+Solo CYC_MINIPAN richiede QUANTITA1 e QUANTITA2 nel CSV (numeriche non negative).
+Sono assegnate ai campi omonimi in ORDINI, OPERAZIONI e JOBSET;
+in EVENTI solo a CLS e in SITUAZIONI solo a WORK, sia MAC sia OPE.
+WSET mantiene le quantità a zero; gli altri eventi mantengono NULL.
+TASKS non contiene questi due campi: FVALUE01/FVALUE02 restano invariati.
+Il CSV MINIPAN incluso contiene 10 e 10, come le query di riferimento.
+
+## Regole CASSETTEPANE
+
+Solo per CYC_CASSETTEPANE (ignora maiuscole e spazi esterni):
+- QTA_CICLO = 2 in TASKS, OPERAZIONI, EVENTI e SITUAZIONI.
+- In TASKS, TOT_LAVORO_MAC e TOT_LAVORO_MAN sono la differenza
+  DATA_FINE_PROG - DATA_INIZ_PROG in ore intere, arrotondate per difetto
+  e scritte con cinque decimali (840,08333 ore diventa 840,00000).
+  Si considera tutto l'intervallo, inclusi i giorni; nessuna esclusione di festivi.
+- In TASKS, TOT_SETUP_MAC = TEFF_SETUP_MAC; TOT_SETUP_MAN resta invariato.
+Le date programmate devono essere presenti e ordinate cronologicamente.
+
+Solo per CYC_CASSETTEPANE, in OPERAZIONI QTA_SCARTATA e QTA_SOSPESA sono zero.
+
+Per `CYC_CASSETTEPANE`, in EVENTI `QTA_CICLO` vale 2 solo per OPNS e OPN (MAC e OPE); per CLSS e CLS vale NULL. In SITUAZIONI vale 2 su tutte le righe WSET e WORK, sia MAC sia OPE.
