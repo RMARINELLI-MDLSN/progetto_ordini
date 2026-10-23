@@ -1,5 +1,6 @@
 """Generazione INSERT per eventi; valori e regole del modello originale."""
 
+from .. import scrostatore
 from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
 
@@ -239,6 +240,18 @@ def costruisci_insert_eventi(riga):
             applica_quantita(valori, riga, completata=evento == "CLS")
             if riga["COD_CICLO"].strip().upper() == "CYC_CASSETTEPANE":
                 valori["QTA_CICLO"] = sql_numero("2") if evento in ("OPNS", "OPN") else "NULL"
+            if scrostatore.attivo(riga):
+                valori['UTENTE'] = sql_testo(riga.get('UTENTE_REGISTRAZIONE', '').strip() or riga['UTENTE_UPD'])
+                valori['FALTPNUMB'] = sql_testo('0') if evento == 'CLS' else 'NULL'
+                if evento == 'CLS':
+                    c = scrostatore.numero(riga, 'QTY_COMPLETATA')
+                    q = scrostatore.numero(riga, 'QTY_CONTATA')
+                    valori['PART_NUMBER'] = sql_testo(riga['PART_NUMBER'])
+                    valori['QTA_COMPLETATA'] = sql_numero(str(c))
+                    valori['QTA_CONTATA'] = sql_numero(str(q))
+                    valori['LOTTO'] = 'NULL'
+                else:
+                    valori['QTA_CONTATA'] = 'NULL'
             nomi = ", ".join(f"[{c}]" for c in COLONNE_EVENTI)
             dati = ",\n    ".join(valori[c] for c in COLONNE_EVENTI)
             istruzioni.append(f"INSERT [dbo].[eventi] ({nomi})\nVALUES (\n    {dati}\n);\nGO\n")

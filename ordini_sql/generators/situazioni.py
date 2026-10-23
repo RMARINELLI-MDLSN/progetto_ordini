@@ -1,5 +1,6 @@
 """Generazione INSERT per situazioni; valori e regole del modello originale."""
 
+from .. import scrostatore
 from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
 from datetime import datetime, timedelta
@@ -53,12 +54,14 @@ def costruisci_insert_situazioni(riga):
         finsdate = inizio + timedelta(days=2)
     except OverflowError as errore:
         raise ValueError("FINSDATE fuori intervallo per situazioni.") from errore
+    fasi = [(1, 'WSET', inizio, fine_setup, 'WSET'), (2, 'WORK', inizio_lavoro, fine, 'CLS')]
+    if scrostatore.attivo(riga) and riga.get('DATA_EVENTO_UPD', '').strip():
+        aggiornamento = datetime.fromisoformat(riga['DATA_EVENTO_UPD'])
+        fasi = [fasi[0], (2, 'WORK', inizio_lavoro, aggiornamento, 'UPD'), (3, 'WORK', aggiornamento, fine, 'CLS')]
     istruzioni = []
     for tipo_oggetto in ("MAC", "OPE"):
         oggetto = riga["MACCHINA"] if tipo_oggetto == "MAC" else riga["UTENTE_EVENTI"]
-        for fase, tipo, ora_inizio, ora_fine in (
-            (1, "WSET", inizio, fine_setup), (2, "WORK", inizio_lavoro, fine)
-        ):
+        for fase, tipo, ora_inizio, ora_fine, evento in fasi:
             valori = dict.fromkeys(COLONNE_SITUAZIONI, "NULL")
             for campo in """LAVORO LAVORO_GIUST QTA_CICLO QTA_COMPLETATA QTA_CONTATA
             QTA_RICHIESTA QTA_SCARTATA QTA_SOSPESA QUANTITA1 QUANTITA2 QUANTITA3
@@ -90,6 +93,15 @@ def costruisci_insert_situazioni(riga):
             if tipo_oggetto == "MAC" and fase == 2:
                 valori["LAVORO"] = ore_da_intervallo(ora_inizio, ora_fine)
             applica_quantita(valori, riga, completata=tipo == "WORK")
+            if scrostatore.attivo(riga):
+                c, q = scrostatore.quantita_fase(riga, evento)
+                valori['QTA_COMPLETATA'] = sql_numero(str(c))
+                valori['QTA_CONTATA'] = sql_numero(str(q))
+                valori['LOTTO'] = sql_testo('0') if evento == 'UPD' else 'NULL'
+                valori['CHIUSURA'] = sql_testo('O') if tipo_oggetto == 'MAC' and evento == 'CLS' else 'NULL'
+                data_ins = riga.get('FINSDATE_'+tipo_oggetto, '').strip()
+                if data_ins:
+                    valori['FINSDATE'] = sql_data(data_ins)
             nomi = ", ".join(f"[{c}]" for c in COLONNE_SITUAZIONI)
             dati = ",\n    ".join(valori[c] for c in COLONNE_SITUAZIONI)
             ricerca = (

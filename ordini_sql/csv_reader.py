@@ -1,5 +1,6 @@
 """Lettura CSV con separatore punto e virgola; intestazione esclusa."""
 
+from .scrostatore import attivo, valida
 import csv
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -40,6 +41,7 @@ def completa_setup(riga):
     INIZIO_LAVORAZIONE = CHIUSURA_ATTREZZAGGIO + WSET_WORK secondi.
     setup_secondi = int(TEFF_SETUP_MAC * 3600), arrotondato per difetto.
     DATA_FINE = INIZIO_LAVORAZIONE + VALORE01 minuti + setup_secondi.
+    Solo CIC_SCROSTATORE omette setup_secondi dal calcolo della fine.
     CHIUSURA_ATTREZZAGGIO e DATA_FINE hanno sempre millesimi .000.
     Le colonne derivate eventualmente presenti nei vecchi CSV sono ignorate.
     """
@@ -62,7 +64,9 @@ def completa_setup(riga):
     risultato["INIZIO_LAVORAZIONE"] = inizio_lavorazione.isoformat(sep=" ", timespec="milliseconds")
     minuti = durata_non_negativa(risultato["VALORE01"], "VALORE01")
     durata_ms = int((minuti * Decimal("60000")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-    fine = inizio_lavorazione + timedelta(milliseconds=durata_ms, seconds=setup_secondi)
+    fine = inizio_lavorazione + timedelta(milliseconds=durata_ms, seconds=0 if attivo(risultato) else setup_secondi)
     fine = fine.replace(microsecond=0)
     risultato["DATA_FINE"] = fine.isoformat(sep=" ", timespec="milliseconds")
+    if attivo(risultato):
+        valida(risultato)
     return risultato
