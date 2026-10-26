@@ -1,6 +1,6 @@
 """Generazione INSERT per operazioni; valori e regole del modello originale."""
 
-from ..tempi_previsti import SETUP_ORE
+from .. import tempi_previsti
 from .. import scrostatore
 from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
@@ -96,21 +96,16 @@ def costruisci_insert_operazioni(riga):
     if riga["COD_CICLO"].strip().upper() == "CYC_CASSETTEPANE":
         valori["QTA_SCARTATA"] = sql_numero("0")
         valori["QTA_SOSPESA"] = sql_numero("0")
-    if riga["COD_CICLO"].strip().upper() in {"CYC_MINIPAN", "CYC_CASSETTEPANE"}:
-        valori["T_LAVORO_MAC"] = sql_numero(str(SETUP_ORE))
-        valori["T_LAVORO_MAN"] = sql_numero(str(SETUP_ORE))
-        valori["T_SETUP_MAC"] = sql_numero(str(SETUP_ORE))
-        valori["T_SETUP_MAN"] = sql_numero(str(SETUP_ORE))
-    if riga["COD_CICLO"].strip().upper() == "CYC_CASSETTEPANE":
-        valori["T_LAVORO_MAC"] = sql_numero("0.5")
-        valori["T_LAVORO_MAN"] = sql_numero("0.5")
+    if tempi_previsti.attivo(riga):
+        unitario = sql_numero(str(tempi_previsti.tempo_unitario(riga)))
+        setup = sql_numero(str(tempi_previsti.setup_previsto(riga)))
+        for risorsa in ('MAC', 'MAN'):
+            valori['T_LAVORO_'+risorsa] = unitario
+            valori['T_SETUP_'+risorsa] = setup
     applica_quantita(valori, riga)
     if scrostatore.attivo(riga):
         valori['NUM_SPLIT'] = 'CAST(0 AS Numeric(6, 0))'
         valori['DATA_UPD'] = sql_data(riga['DATA_FINE'])
-        for risorsa in ('MAC', 'MAN'):
-            valori['T_LAVORO_'+risorsa] = sql_numero(str(scrostatore.numero(riga, 'TEMPO_UNITARIO_PREVISTO', '0.16670')))
-            valori['T_SETUP_'+risorsa] = sql_numero(str(scrostatore.numero(riga, 'SETUP_PREVISTO', '0.16670')))
     nomi = ", ".join(f"[{c}]" for c in COLONNE_OPERAZIONI)
     dati = ",\n    ".join(valori[c] for c in COLONNE_OPERAZIONI)
     return f"INSERT [dbo].[OPERAZIONI] ({nomi})\nVALUES (\n    {dati}\n);\nGO\n"

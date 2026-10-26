@@ -1,6 +1,7 @@
 """Lettura CSV con separatore punto e virgola; intestazione esclusa."""
 
 from .scrostatore import attivo, valida
+from . import tempi_previsti
 import csv
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -66,7 +67,16 @@ def completa_setup(riga):
     durata_ms = int((minuti * Decimal("60000")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     fine = inizio_lavorazione + timedelta(milliseconds=durata_ms, seconds=0 if attivo(risultato) else setup_secondi)
     fine = fine.replace(microsecond=0)
+    if tempi_previsti.attivo(risultato) and minuti == 0:
+        if not risultato.get('DATA_FINE_PROG', '').strip():
+            raise ValueError('DATA_FINE_PROG obbligatoria quando VALORE01 = 0.')
+        sql_data(risultato['DATA_FINE_PROG'])
+        fine = (datetime.fromisoformat(risultato['DATA_FINE_PROG'].strip()) - timedelta(seconds=1)).replace(microsecond=0)
+        if fine <= inizio_lavorazione:
+            raise ValueError('DATA_FINE_PROG non lascia spazio per una fine successiva a INIZIO_LAVORAZIONE.')
     risultato["DATA_FINE"] = fine.isoformat(sep=" ", timespec="milliseconds")
     if attivo(risultato):
+        # Il CSV standard non distingue la quantità contata dalla completata.
+        risultato.setdefault('QTY_CONTATA', risultato.get('QTY_COMPLETATA', ''))
         valida(risultato)
     return risultato

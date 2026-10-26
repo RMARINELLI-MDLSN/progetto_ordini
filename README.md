@@ -194,32 +194,37 @@ WSET mantiene le quantità a zero; gli altri eventi mantengono NULL.
 TASKS: FVALUE01 copia QUANTITA01 se presente, altrimenti QUANTITA1; FVALUE02 resta invariato.
 Il CSV MINIPAN incluso contiene 10 e 10, come le query di riferimento.
 
-## Regole CASSETTEPANE
+## Tempi previsti per MINIPAN, CASSETTEPANE, SCROSTATORE, BS e ALMA
 
-Solo per CYC_CASSETTEPANE (ignora maiuscole e spazi esterni):
-- QTA_CICLO = 2 in TASKS, OPERAZIONI e SITUAZIONI; in EVENTI solo OPNS e OPN.
-- In TASKS, TOT_SETUP_MAC e TOT_SETUP_MAN = 0.08330 ore esatte.
-- In TASKS, TOT_LAVORO_MAC/MAN = (DATA_FINE_PROG - DATA_INIZ_PROG) in ore meno il rispettivo TOT_SETUP. Il risultato è arrotondato a cinque decimali (half up), senza troncare le ore intere. Un intervallo di 24 ore produce 23.91670 ore di lavoro.
-- In OPERAZIONI, T_LAVORO_MAC/MAN = 0.50000 ore. T_SETUP_MAC/MAN = 0.08330, come i rispettivi TOT_SETUP di TASKS.
-Si considera tutto l'intervallo, inclusi i giorni; nessuna esclusione di festivi. Le date programmate devono essere presenti e l'intervallo non può essere inferiore al setup.
+Cicli riconosciuti (senza distinzione maiuscole/minuscole): CYC_MINIPAN, CYC_CASSETTEPANE (TRASBELT/LCP), CIC_SCROSTATORE (SCR), CYC_BSTram (BS), CYC_ALMA.
 
-Solo per CYC_CASSETTEPANE, in OPERAZIONI QTA_SCARTATA e QTA_SOSPESA sono zero.
+- Ore disponibili = DATA_FINE_PROG - DATA_INIZ_PROG, includendo tutti i giorni.
+- Setup previsto: 0.08330 ore per MINIPAN, CASSETTEPANE, BS e ALMA. SCROSTATORE legge SETUP_PREVISTO (default 0.16670).
+- TASKS TOT_LAVORO_MAC/MAN = ore disponibili meno setup, a cinque decimali; TOT_SETUP_MAC/MAN = setup previsto.
+- OPERAZIONI T_LAVORO_MAC/MAN = (ore disponibili meno setup) / QTY_RICHIESTA, a cinque decimali per difetto. T_SETUP_MAC/MAN = setup previsto. QTA_BASE rimane 1.
+- QTY_RICHIESTA deve essere positiva. Le date devono essere valide e l'intervallo deve coprire il setup.
+- La quantità completata non determina i tempi previsti. Dopo ogni variazione delle quantità occorre rigenerare gli SQL.
+- Il totale tempo unitario * quantità richiesta + setup non supera il budget pianificato; il troncamento può lasciare un piccolo residuo. Il calcolo effettivo della schermata web dipende dalla query del gestionale, non verificata qui.
+- TEMPO_UNITARIO_PREVISTO nel vecchio CSV SCROSTATORE viene ignorato: il tempo è ora calcolato dalle date e dalla quantità.
 
-Per `CYC_CASSETTEPANE`, in EVENTI `QTA_CICLO` vale 2 solo per OPNS e OPN (MAC e OPE); per CLSS e CLS vale NULL. In SITUAZIONI vale 2 su tutte le righe WSET e WORK, sia MAC sia OPE.
+Con VALORE01 = 0, per questi cinque cicli DATA_FINE = DATA_FINE_PROG meno un secondo, arrotondata al secondo inferiore (.000). Deve essere successiva a INIZIO_LAVORAZIONE, altrimenti la generazione viene fermata. VALORE01 resta zero e quindi anche TEFF_LAVORO_MAC/MAN in TASKS, OPERAZIONI e JOBSET resta zero; SITUAZIONI usa gli intervalli delle date. Con VALORE01 positivo restano le precedenti formule della fine.
 
-Solo MINIPAN: TASKS TOT_SETUP_MAC/MAN = 0.08330 ore esatte. TOT_LAVORO_MAC/MAN = (DATA_FINE_PROG - DATA_INIZ_PROG) in ore meno il rispettivo setup, a cinque decimali. Intervalli inferiori al setup sono rifiutati. OPERAZIONI T_LAVORO_MAC/MAN copia il rispettivo TOT_SETUP di TASKS (0.08330).
+I forni CYC_FORNO1...7 conservano tutte le regole precedenti.
 
-Solo MINIPAN: anche OPERAZIONI T_SETUP_MAC e T_SETUP_MAN copiano rispettivamente TASKS TOT_SETUP_MAC e TOT_SETUP_MAN (0.08330 ore).
+## Altre regole CASSETTEPANE
 
+QTA_CICLO = 2 in TASKS, OPERAZIONI e tutte le SITUAZIONI. In EVENTI è 2 solo per OPNS e OPN, NULL per CLSS e CLS.
+OPERAZIONI NUM_SPLIT, QTA_SCARTATA e QTA_SOSPESA sono zero.
 
 ## CIC_SCROSTATORE (GASPERINI)
-Il CSV di esempio `Ordini_GASPERINI_20062024.csv` riproduce gli SQL GASPERINI del 20 giugno 2024.
-Solo per questo ciclo DATA_FINE = INIZIO_LAVORAZIONE + VALORE01 minuti, senza aggiungere nuovamente il setup. Restano gli arrotondamenti al secondo del lettore CSV.
-VALORE01 = 4,08333 produce 245 secondi e TEFF_LAVORO_MAC/MAN = 0,06806 in TASKS, OPERAZIONI e JOBSET.
-QTY_CONTATA è obbligatoria e distinta da QTY_COMPLETATA; alimenta CICLI_CONTATI di TASKS. QTA_CONTATA in TASKS rimane zero, in JOBSET NULL.
-TEMPO_UNITARIO_PREVISTO e SETUP_PREVISTO sono in ore, entrambi con default 0.16670 dal modello fornito. TASKS TOT_LAVORO_MAC/MAN = TEMPO_UNITARIO_PREVISTO * QTY_RICHIESTA; TOT_SETUP_MAC/MAN = SETUP_PREVISTO. OPERAZIONI usa gli stessi tempi unitari nei campi T_LAVORO e T_SETUP, NUM_SPLIT = 0 e DATA_UPD = DATA_FINE. ORDINI FAVOIDRSTPRIO = N.
-DATA_EVENTO_UPD è facoltativa: se presente deve cadere strettamente tra inizio lavoro e fine. Richiede QTY_CONTATA_UPD e QTY_COMPLETATA_UPD, quantità registrate all'aggiornamento. La seconda riga WORK di SITUAZIONI riceve i residui rispetto ai totali; sono rifiutati aggiornamenti superiori ai totali. Senza UPD tutte le quantità sono registrate in CLS.
-EVENTI genera solo OPNS, CLSS, OPN e CLS per MAC/OPE, senza UPD. CLS registra l’intera QTY_COMPLETATA e QTY_CONTATA. UTENTE_REGISTRAZIONE, o UTENTE_UPD se assente, alimenta UTENTE; UTENTE_EVENTI identifica l'operatore. SITUAZIONI separa WORK prima e dopo UPD e calcola i tempi di ciascun intervallo. I progressivi restano allocati alla prima posizione libera in transazione.
-FINSDATE_MAC e FINSDATE_OPE facoltative conservano le date di inserimento specifiche dello SQL originale; se omesse resta DATA_INIZIO + 2 giorni.
-Il campione contiene 8 pezzi completati, 12 richiesti e 15 contati: in EVENTI CLS registra 8 completati e 15 contati. In SITUAZIONI restano due intervalli WORK (8/14 e 0/1). Si generano 18 INSERT e nessun FPROCESSDATA.
-Il precedente CSV con VALORE01=3,4 va sostituito con il campione aggiornato per questo ciclo.
+
+Con VALORE01 positivo DATA_FINE = INIZIO_LAVORAZIONE + VALORE01 minuti senza aggiungere nuovamente il setup. Con VALORE01 = 0 vale la regola della fine pianificata sopra.
+QTY_CONTATA è opzionale: se la colonna manca, copia QTY_COMPLETATA; se presente deve contenere un numero non negativo. La quantità contata alimenta CICLI_CONTATI di TASKS. QTA_CONTATA in TASKS rimane zero e in JOBSET NULL.
+OPERAZIONI NUM_SPLIT = 0, DATA_UPD = DATA_FINE. ORDINI FAVOIDRSTPRIO = N.
+EVENTI genera solo OPNS, CLSS, OPN e CLS per MAC/OPE, senza UPD. CLS registra tutta QTY_COMPLETATA e QTY_CONTATA. UTENTE_REGISTRAZIONE, o UTENTE_UPD se assente, alimenta UTENTE; UTENTE_EVENTI identifica l'operatore.
+SITUAZIONI può mantenere due intervalli WORK: DATA_EVENTO_UPD facoltativa indica il confine, strettamente tra inizio lavoro e fine. QTY_CONTATA_UPD e QTY_COMPLETATA_UPD descrivono le quantità del primo intervallo; il secondo riceve i residui. Variando i totali, le quantità intermedie non possono superarli. Omettendo DATA_EVENTO_UPD si genera un solo WORK con tutte le quantità.
+FINSDATE_MAC/OPE facoltative conservano date di inserimento specifiche; se omesse si usa DATA_INIZIO + 2 giorni. I progressivi vengono assegnati alla prima posizione libera, in transazione.
+Il CSV GASPERINI incluso contiene 8 pezzi completati, 12 richiesti, 15 contati e produce 18 INSERT, senza FPROCESSDATA. I tempi previsti ora seguono le date pianificate anziché il tempo unitario fisso dello SQL originale.
+
+
+Il nuovo CSV standard per lo scrostatore è Ordini_SCR.csv: non richiede colonne aggiuntive. Impostare file_csv a Ordini_SCR.csv nel proprio config.json. In assenza di DATA_EVENTO_UPD viene generato un solo WORK per MAC/OPE, senza eventi UPD. Se mancano SETUP_PREVISTO e FINSDATE_MAC/OPE restano rispettivamente il default 0.16670 ore e DATA_INIZIO + 2 giorni. Il vecchio campione GASPERINI rimane come esempio con campi opzionali.

@@ -1,6 +1,6 @@
 """Generazione INSERT per tasks; valori e regole del modello originale."""
 
-from ..tempi_previsti import SETUP_ORE, lavoro_pianificato
+from .. import tempi_previsti
 from .. import scrostatore
 from ..quantita import applica_quantita
 from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
@@ -77,10 +77,10 @@ def costruisci_insert_tasks(riga):
     valori["TEFF_LAVORO_MAC"] = ore
     valori["TEFF_LAVORO_MAN"] = ore
     applica_quantita(valori, riga, aggiorna_contata=False)
-    if riga['COD_CICLO'].strip().upper() in {'CYC_MINIPAN', 'CYC_CASSETTEPANE'}:
-        lavoro = sql_numero(str(lavoro_pianificato(riga)))
+    if tempi_previsti.attivo(riga):
+        lavoro = sql_numero(str(tempi_previsti.lavoro_pianificato(riga)))
         for risorsa in ('MAC', 'MAN'):
-            valori['TOT_SETUP_' + risorsa] = sql_numero(str(SETUP_ORE))
+            valori['TOT_SETUP_' + risorsa] = sql_numero(str(tempi_previsti.setup_previsto(riga)))
             valori['TOT_LAVORO_' + risorsa] = lavoro
     if riga['COD_CICLO'].strip().upper() == 'CYC_MINIPAN':
         # QUANTITA1 è il nome storico nel CSV; QUANTITA01 ha precedenza se fornita.
