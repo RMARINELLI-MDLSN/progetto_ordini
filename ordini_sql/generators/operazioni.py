@@ -3,7 +3,7 @@
 from .. import tempi_previsti
 from .. import scrostatore
 from ..quantita import applica_quantita
-from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
+from ..conversions import sql_testo, sql_data, sql_numero, lavoro_effettivo_sql
 
 COLONNE_OPERAZIONI = """
 ORDINE OPERAZIONE C_ESTERNO C_FIX_MAC C_FIX_MAN C_MACCHINA C_MANODOPERA CAUSALE
@@ -52,7 +52,7 @@ def costruisci_insert_operazioni(riga):
 
     ID_OPER deriva da TASK; OPERAZIONE da OPERAZIONI; MACCHINA_ASSEGNATA
     da MACCHINA. CENTRO_REALE copia CENTRO_ASSEGNATO e UTENTE_UPD resta WS come nel modello.
-    I tempi di lavoro derivano da VALORE01 / 60, come per TASKS.
+    I tempi effettivi seguono la stessa formula di TASKS: intervallo meno setup, eccetto i forni.
     """
     richiesti = (list(TESTO_OPERAZIONI.values()) + list(DATE_OPERAZIONI.values())
                  + ["VALORE01", "TEFF_SETUP_MAC", "TEFF_SETUP_MAN"])
@@ -88,7 +88,7 @@ def costruisci_insert_operazioni(riga):
     for campo in ("TEFF_SETUP_MAC", "TEFF_SETUP_MAN"):
         valore = riga[campo]
         valori[campo] = sql_numero(valore) if valore.strip() else "NULL"
-    ore = minuti_in_ore_sql(riga["VALORE01"])
+    ore = lavoro_effettivo_sql(riga)
     valori["TEFF_LAVORO_MAC"] = ore
     valori["TEFF_LAVORO_MAN"] = ore
     valori["CENTRO_REALE"] = valori["CENTRO_ASSEGNATO"]

@@ -207,7 +207,7 @@ Cicli riconosciuti (senza distinzione maiuscole/minuscole): CYC_MINIPAN, CYC_CAS
 - Il totale tempo unitario * quantità richiesta + setup non supera il budget pianificato; il troncamento può lasciare un piccolo residuo. Il calcolo effettivo della schermata web dipende dalla query del gestionale, non verificata qui.
 - TEMPO_UNITARIO_PREVISTO nel vecchio CSV SCROSTATORE viene ignorato: il tempo è ora calcolato dalle date e dalla quantità.
 
-Con VALORE01 = 0, per questi cinque cicli DATA_FINE = DATA_FINE_PROG meno un secondo, arrotondata al secondo inferiore (.000). Deve essere successiva a INIZIO_LAVORAZIONE, altrimenti la generazione viene fermata. VALORE01 resta zero e quindi anche TEFF_LAVORO_MAC/MAN in TASKS, OPERAZIONI e JOBSET resta zero; SITUAZIONI usa gli intervalli delle date. Con VALORE01 positivo restano le precedenti formule della fine.
+Con VALORE01 = 0, per questi cinque cicli DATA_FINE = DATA_FINE_PROG meno un secondo, arrotondata al secondo inferiore (.000). Deve essere successiva a INIZIO_LAVORAZIONE, altrimenti la generazione viene fermata. Con VALORE01 zero TASKS, OPERAZIONI e JOBSET seguono la formula effettiva descritta sotto. SITUAZIONI usa gli intervalli delle date. Con VALORE01 positivo restano le precedenti formule della fine.
 
 I forni CYC_FORNO1...7 conservano tutte le regole precedenti.
 
@@ -228,3 +228,8 @@ Il CSV GASPERINI incluso contiene 8 pezzi completati, 12 richiesti, 15 contati e
 
 
 Il nuovo CSV standard per lo scrostatore è Ordini_SCR.csv: non richiede colonne aggiuntive. Impostare file_csv a Ordini_SCR.csv nel proprio config.json. In assenza di DATA_EVENTO_UPD viene generato un solo WORK per MAC/OPE, senza eventi UPD. Se mancano SETUP_PREVISTO e FINSDATE_MAC/OPE restano rispettivamente il default 0.16670 ore e DATA_INIZIO + 2 giorni. Il vecchio campione GASPERINI rimane come esempio con campi opzionali.
+
+
+## Tempi effettivi TASKS, OPERAZIONI e JOBSET
+Per tutti i cicli esclusi CYC_FORNO1...7: TEFF_LAVORO_MAC e TEFF_LAVORO_MAN = (secondi tra DATA_INIZIO e DATA_FINE / 3600) - TEFF_SETUP_MAC. Il setup è già espresso in ore. Si considera tutto l'intervallo (anche su più giorni), arrotondando solo il risultato finale a cinque decimali (half up). L'intervallo include quindi anche l'eventuale pausa WSET_WORK. Date mancanti/non valide e risultati negativi fermano la generazione.
+Per i forni resta VALORE01 / 60. Questa formula si applica a TASKS, OPERAZIONI e JOBSET. SITUAZIONI mantiene le proprie regole.

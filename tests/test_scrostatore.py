@@ -31,6 +31,8 @@ class ScrostatoreTests(unittest.TestCase):
         for tabella,fn in [('ORDINI',costruisci_insert),('TASKS',costruisci_insert_tasks),('OPERAZIONI',costruisci_insert_operazioni),('JOBSET',costruisci_insert_jobset)]:
             with self.subTest(tabella=tabella):
                 attesi = originali[tabella][0].copy()
+                if tabella in ('TASKS', 'OPERAZIONI', 'JOBSET'):
+                    attesi.update(TEFF_LAVORO_MAC='0.07250', TEFF_LAVORO_MAN='0.07250')
                 if tabella == 'TASKS':
                     attesi.update(TOT_LAVORO_MAC='2.00052', TOT_LAVORO_MAN='2.00052')
                 if tabella == 'OPERAZIONI':

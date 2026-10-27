@@ -1,6 +1,7 @@
 {
   "database": {
-  "server_name": "192.168.1.168",
+    "server_name_local": "192.168.1.168",
+  "server_name": "10.9.9.10",
   "istanza": "sqlexpress",
   "db": "netpro",
   "driver": "ODBC Driver 18 for SQL Server",
@@ -10,5 +11,5 @@
   "encrypt": true,
   "trust_server_certificate": true
    },
-  "file_csv": "Ordini_SCR.csv"
+  "file_csv": "Ordini_per_produzione_FORNO7.csv"
 }

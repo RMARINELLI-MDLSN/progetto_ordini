@@ -68,3 +68,22 @@ def ore_da_intervallo(inizio, fine):
     ore = (Decimal(microsecondi) / Decimal("3600000000")).quantize(
         Decimal("0.00001"), rounding=ROUND_HALF_UP)
     return sql_numero(str(ore))
+
+
+def lavoro_effettivo_sql(riga):
+    """TASKS/OPERAZIONI/JOBSET: intervallo effettivo netto setup, eccetto i forni."""
+    ciclo = riga.get('COD_CICLO', '').strip().upper()
+    if ciclo in {f'CYC_FORNO{i}' for i in range(1, 8)}:
+        return minuti_in_ore_sql(riga['VALORE01'])
+    for campo in ('DATA_INIZIO', 'DATA_FINE', 'TEFF_SETUP_MAC'):
+        if not riga.get(campo, '').strip():
+            raise ValueError(f'{campo} obbligatorio per il tempo effettivo di lavoro.')
+    sql_data(riga['DATA_INIZIO'])
+    sql_data(riga['DATA_FINE'])
+    delta = datetime.fromisoformat(riga['DATA_FINE'].strip()) - datetime.fromisoformat(riga['DATA_INIZIO'].strip())
+    microsecondi = (delta.days * 86400 + delta.seconds) * 1000000 + delta.microseconds
+    setup = durata_non_negativa(riga['TEFF_SETUP_MAC'], 'TEFF_SETUP_MAC')
+    ore = Decimal(microsecondi) / Decimal('3600000000') - setup
+    if ore < 0:
+        raise ValueError('Intervallo DATA_INIZIO/DATA_FINE inferiore a TEFF_SETUP_MAC.')
+    return sql_numero(str(ore.quantize(Decimal('0.00001'), rounding=ROUND_HALF_UP)))

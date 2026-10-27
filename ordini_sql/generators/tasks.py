@@ -3,7 +3,7 @@
 from .. import tempi_previsti
 from .. import scrostatore
 from ..quantita import applica_quantita
-from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
+from ..conversions import sql_testo, sql_data, sql_numero, lavoro_effettivo_sql
 
 COLONNE_TASKS = """
 TASK CEFF_ESTERNO CEFF_FIX_MAC CEFF_FIX_MAN CEFF_MACCHINA CEFF_MANODOPERA
@@ -40,7 +40,7 @@ def costruisci_insert_tasks(riga):
 
     UTENTE_UPD proviene da UTENTE_TASK (non dall'utente dell'ordine).
     CICLI_CONTATI legge VALORE01 direttamente, senza conversione in ore.
-    TEFF_LAVORO_MAC/MAN derivano da VALORE01 (minuti / 60), a 5 decimali.
+    TEFF_LAVORO_MAC/MAN: per i non forni, intervallo DATA_INIZIO/DATA_FINE meno setup; per i forni VALORE01 / 60.
     Se una colonna è presente ma vuota, scrive NULL.
     """
     richiesti = list(TESTO_TASKS.values()) + DATE_TASKS + list(TEMPI_TASKS[2:]) + ["VALORE01"]
@@ -73,7 +73,7 @@ def costruisci_insert_tasks(riga):
         valori[campo] = sql_numero(valore) if valore.strip() else "NULL"
     cicli = riga["VALORE01"]
     valori["CICLI_CONTATI"] = sql_numero(cicli) if cicli.strip() else "NULL"
-    ore = minuti_in_ore_sql(riga["VALORE01"])
+    ore = lavoro_effettivo_sql(riga)
     valori["TEFF_LAVORO_MAC"] = ore
     valori["TEFF_LAVORO_MAN"] = ore
     applica_quantita(valori, riga, aggiorna_contata=False)

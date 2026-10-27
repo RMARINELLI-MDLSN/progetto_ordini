@@ -1,7 +1,7 @@
 """Generazione INSERT per jobset; valori e regole del modello originale."""
 
 from ..quantita import applica_quantita
-from ..conversions import sql_testo, sql_data, sql_numero, minuti_in_ore_sql
+from ..conversions import sql_testo, sql_data, sql_numero, lavoro_effettivo_sql
 
 COLONNE_JOBSET = """
 TASK ORDINE OPERAZIONE CEFF_ESTERNO CEFF_FIX_MAC CEFF_FIX_MAN CEFF_MACCHINA
@@ -21,7 +21,8 @@ def costruisci_insert_jobset(riga):
     """Mantiene tutte le colonne JOBSET e sostituisce gli 8 campi richiesti.
 
     TASK alimenta anche ID_OPER; OPERAZIONE proviene da OPERAZIONI nel CSV.
-    I tempi di lavoro sono VALORE01 / 60, arrotondati a 5 decimali.
+    I tempi di lavoro sono l’intervallo DATA_INIZIO/DATA_FINE in ore meno setup.
+    Per i forni resta VALORE01 / 60. Risultato a cinque decimali.
     """
     richiesti = (list(dict.fromkeys(TESTO_JOBSET.values()))
                  + ["VALORE01", "TEFF_SETUP_MAC", "TEFF_SETUP_MAN"])
@@ -43,7 +44,7 @@ def costruisci_insert_jobset(riga):
     for campo in ("TEFF_SETUP_MAC", "TEFF_SETUP_MAN"):
         valore = riga[campo]
         valori[campo] = sql_numero(valore) if valore.strip() else "NULL"
-    ore = minuti_in_ore_sql(riga["VALORE01"])
+    ore = lavoro_effettivo_sql(riga)
     valori["TEFF_LAVORO_MAC"] = ore
     valori["TEFF_LAVORO_MAN"] = ore
     applica_quantita(valori, riga, aggiorna_contata=False)
